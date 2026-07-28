@@ -1,0 +1,12 @@
+{
+  "name": "piccrop-ai",
+  "version": "1.0.0",
+  "description": "Image Cropping and Zooming Web App with Gemini API Integration",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}

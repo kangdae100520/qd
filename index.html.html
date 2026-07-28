@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PicCrop AI - 이미지 자르기 & 확대/축소</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; color: #333; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h1 { text-align: center; margin-bottom: 20px; color: #111; }
+    .upload-box { text-align: center; margin-bottom: 20px; }
+    input[type="file"] { display: none; }
+    .btn { display: inline-block; padding: 10px 18px; background-color: #0070f3; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; transition: background 0.2s; margin: 4px; }
+    .btn:hover { background-color: #0051a2; }
+    .btn-secondary { background-color: #666; }
+    .btn-secondary:hover { background-color: #444; }
+    .btn-ai { background-color: #7928ca; }
+    .btn-ai:hover { background-color: #4c089a; }
+    .img-container { width: 100%; max-height: 450px; margin: 20px 0; background: #eaeded; display: flex; justify-content: center; align-items: center; border-radius: 8px; overflow: hidden; min-height: 250px; }
+    img { max-width: 100%; display: block; }
+    .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 20px; }
+    .result-section { margin-top: 20px; padding: 16px; background: #f0f4f8; border-radius: 8px; font-size: 14px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>✂️ PicCrop AI</h1>
+    
+    <div class="upload-box">
+      <label class="btn">
+        이미지 불러오기
+        <input type="file" id="imageInput" accept="image/*" />
+      </label>
+    </div>
+
+    <div class="img-container">
+      <img id="image" src="" alt="이미지를 선택해주세요" style="display: none;" />
+    </div>
+
+    <div class="controls" id="controlButtons" style="display: none;">
+      <button class="btn btn-secondary" onclick="zoom(0.1)">확대 (+)</button>
+      <button class="btn btn-secondary" onclick="zoom(-0.1)">축소 (-)</button>
+      <button class="btn btn-secondary" onclick="rotate(90)">회전</button>
+      <button class="btn btn-secondary" onclick="reset()">초기화</button>
+      <button class="btn" onclick="downloadImage()">잘라낸 이미지 저장</button>
+      <button class="btn btn-ai" onclick="analyzeImageWithAI()">Gemini AI 이미지 분석</button>
+    </div>
+
+    <div id="aiResult" class="result-section" style="display: none;"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+  <script>
+    let cropper;
+    const image = document.getElementById('image');
+    const imageInput = document.getElementById('imageInput');
+    const controlButtons = document.getElementById('controlButtons');
+    const aiResult = document.getElementById('aiResult');
+
+    imageInput.addEventListener('change', (e) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          image.src = event.target.result;
+          image.style.display = 'block';
+          if (cropper) cropper.destroy();
+          cropper = new Cropper(image, {
+            viewMode: 1,
+            autoCropArea: 0.8,
+            responsive: true,
+          });
+          controlButtons.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function zoom(ratio) { if (cropper) cropper.zoom(ratio); }
+    function rotate(degree) { if (cropper) cropper.rotate(degree); }
+    function reset() { if (cropper) cropper.reset(); }
+
+    function downloadImage() {
+      if (!cropper) return;
+      const canvas = cropper.getCroppedCanvas();
+      const link = document.createElement('a');
+      link.download = 'cropped-image.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function analyzeImageWithAI() {
+      if (!cropper) return;
+      const canvas = cropper.getCroppedCanvas();
+      const base64Data = canvas.toDataURL('image/jpeg');
+
+      aiResult.style.display = 'block';
+      aiResult.textContent = 'Gemini가 이미지를 분석 중입니다...';
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: '잘라낸 이미지를 간단히 설명하고 개선점을 추천해줘.',
+            imageBase64: base64Data
+          })
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+          aiResult.textContent = '🤖 Gemini 분석 결과:\n' + data.candidates[0].content.parts[0].text;
+        } else {
+          aiResult.textContent = '응답을 불러오지 못했습니다: ' + JSON.stringify(data);
+        }
+      } catch (err) {
+        aiResult.textContent = '오류 발생: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
